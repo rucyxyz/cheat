@@ -1,9 +1,9 @@
 {
-  "name": "aimware-panel",
+  "name": "cheat",
   "version": "1.0.0",
-  "description": "Aimware style settings panel",
+  "description": "Standalone settings panel for the cheat",
   "main": "main.js",
-  "author": "you",
+  "author": "your-name <you@example.com>",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win nsis portable"
@@ -13,8 +13,9 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "ai.local.aimwarepanel",
-    "productName": "Aimware Panel",
+    "appId": "io.github.yourname.cheat",
+    "productName": "cheat",
+    "artifactName": "cheat-${version}-win-${arch}.${ext}",
     "directories": { "output": "dist" },
     "files": ["main.js", "preload.js", "renderer/**/*"],
     "win": { "target": ["nsis", "portable"], "icon": "build/icon.ico" },
