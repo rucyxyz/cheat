@@ -1,9 +1,28 @@
 {
   "name": "cheat",
   "version": "1.0.0",
-  "description": "Standalone settings panel for the cheat",
+  "description": "Electron settings panel with aimbot / ESP / visuals tabs, configs and mod loading",
   "main": "main.js",
-  "author": "your-name <you@example.com>",
+  "author": "rucyxyz",
+  "license": "MIT",
+  "homepage": "https://github.com/rucyxyz/cheat",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rucyxyz/cheat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rucyxyz/cheat/issues"
+  },
+  "keywords": [
+    "electron",
+    "cheat",
+    "settings-ui",
+    "overlay",
+    "aimware"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win nsis portable"
@@ -13,11 +32,29 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "io.github.yourname.cheat",
+    "appId": "io.github.rucyxyz.cheat",
     "productName": "cheat",
-    "artifactName": "cheat-${version}-win-${arch}.${ext}",
-    "directories": { "output": "dist" },
-    "files": ["main.js", "preload.js", "renderer/**/*"],
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "cheat-${version}-win-${arch}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "cheat-${version}-win-${arch}-portable.${ext}"
+    }
   }
 }
