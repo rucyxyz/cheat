@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Aimware Panel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="titlebar">
+    <div class="brand">aimware</div>
+    <div class="spacer"></div>
+    <button class="wbtn" id="minBtn" title="Minimize">
+      <svg viewBox="0 0 12 12"><path d="M2 6h8"/></svg>
+    </button>
+    <button class="wbtn close" id="closeBtn" title="Close">
+      <svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6"/></svg>
+    </button>
+  </div>
+
+  <div class="panel" id="panel">
+    <aside class="side" id="side"></aside>
+    <main class="content" id="content"></main>
+    <div class="wm" id="wm">build 2.4.1</div>
+    <div class="toast" id="toast"></div>
+
+    <div class="modal" id="modal">
+      <div class="mbox">
+        <div class="mtitle">Save config</div>
+        <div class="mdesc">Store the current setup under a name.</div>
+        <input class="minput" id="mInput" spellcheck="false" placeholder="Config name">
+        <div class="mbtns">
+          <button class="btn" id="mCancel">Cancel</button>
+          <button class="btn primary" id="mSave">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <input type="file" id="modFile" accept=".json,application/json" hidden>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
