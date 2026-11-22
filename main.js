@@ -42,8 +42,12 @@ app.whenReady().then(() => {
       nodeIntegration: false
     }
   });
-  win.loadFile('renderer/index.html');
+
+  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   win.once('ready-to-show', () => win.show());
+
+  // 切り分け用。落ち着いたらコメントアウト
+  win.webContents.openDevTools({ mode: 'detach' });
 });
 
 app.on('window-all-closed', () => app.quit());
