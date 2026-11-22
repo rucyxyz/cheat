@@ -1,11 +1,54 @@
 (function () {
-  // --- 永続化シム（localStorage の代わりに userData の JSON へ） ---
-  const disk = window.api.store;
-  const LS = {
-    getItem: k => disk.get(k),
-    setItem: (k, v) => disk.set(k, String(v)),
-    removeItem: k => disk.set(k, null)
-  };
+  const statEl = document.getElementById('stat');
+  if (statEl) statEl.textContent = 'app.js 読込済み';
+  console.log('app.js loaded');
+
+  function fatal(msg) {
+    const bar = document.getElementById('err');
+    if (bar) {
+      bar.hidden = false;
+      bar.textContent = String(msg);
+      return;
+    }
+    const c = document.getElementById('content');
+    if (!c) return;
+    c.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'card accent';
+    box.style.cssText = 'flex-direction:column;align-items:flex-start';
+    const t = document.createElement('div');
+    t.className = 'ctitle';
+    t.textContent = 'Script error';
+    const d = document.createElement('div');
+    d.className = 'cdesc';
+    d.style.whiteSpace = 'pre-wrap';
+    d.style.userSelect = 'text';
+    d.textContent = String(msg);
+    box.append(t, d);
+    c.appendChild(box);
+  }
+  window.addEventListener('error', ev => fatal(ev.message + ' @ ' + (ev.filename || '') + ':' + ev.lineno));
+
+  let hasBridge = false;
+  const LS = (() => {
+    try {
+      if (window.api && window.api.store) {
+        const s = window.api.store;
+        s.get('__probe');
+        hasBridge = true;
+        return {
+          getItem: k => s.get(k),
+          setItem: (k, v) => s.set(k, String(v)),
+          removeItem: k => s.set(k, null)
+        };
+      }
+    } catch (e) {}
+    return {
+      getItem: k => localStorage.getItem(k),
+      setItem: (k, v) => localStorage.setItem(k, v),
+      removeItem: k => localStorage.removeItem(k)
+    };
+  })();
 
   const I = {
     aim: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>',
@@ -31,7 +74,7 @@
       { rows: [{ t: 'tog', id: 'esp.box', label: '2D Box', desc: 'Outline drawn around every enemy' }] },
       { rows: [{ t: 'tog', id: 'esp.sil', label: 'Silhouette', desc: 'Fill enemies through walls' }] },
       { rows: [{ t: 'tog', id: 'esp.hp', label: 'Health', desc: 'Remaining HP above each player' }] },
-      { rows: [{ t: 'tog', id: 'esp.radar', label: 'Radar', desc: 'Off-screen positions on a minimap' }] },
+      { rows: [{ t: 'tog', id: 'esp.radar', label: 'Off-screen positions on a minimap' }] },
       { rows: [{ t: 'tog', id: 'esp.snap', label: 'Snaplines', desc: 'Line from you to each enemy' }] }
     ]},
     { id: 'vis', title: 'Visuals', sub: 'Colour Settings', icon: I.vis, head: 'Colour Settings', cards: [
@@ -108,11 +151,11 @@
   const readJSON = (k, fb) => {
     try {
       const v = JSON.parse(LS.getItem(k));
-      return v && typeof v === 'object' ? { ...fb, ...v } : fb;
-    } catch { return fb; }
+      return v && typeof v === 'object' ? Object.assign({}, fb, v) : fb;
+    } catch (e) { return fb; }
   };
 
-  let S = readJSON(K_S, { ...DEFAULTS });
+  let S = readJSON(K_S, Object.assign({}, DEFAULTS));
   let CFG = readJSON(K_C, JSON.parse(JSON.stringify(BUILTIN)));
   let active = LS.getItem(K_A) || 'Legit';
   if (!CFG[active]) active = Object.keys(CFG)[0];
@@ -120,8 +163,8 @@
   let tab = LS.getItem(K_T) || 'aimbot';
   if (!TABS.some(t => t.id === tab)) tab = 'aimbot';
 
-  const save = () => LS.setItem(K_S, JSON.stringify(S));
-  const set = (id, v) => { S[id] = v; save(); };
+  function save() { LS.setItem(K_S, JSON.stringify(S)); }
+  function set(id, v) { S[id] = v; save(); }
 
   function el(tag, cls, txt) {
     const e = document.createElement(tag);
@@ -162,7 +205,6 @@
 
   function buildCard(c) {
     const card = el('div', 'card' + (c.accent ? ' accent' : ''));
-
     if (c.presets) {
       card.classList.add('pcard');
       const w = el('div');
@@ -173,7 +215,8 @@
         ['Apocalypse', { 'fx.sky': '#ef4444', 'fx.spec': 85, 'vis.outline': '#ef4444' }],
         ['Hellfire', { 'fx.sky': '#f97316', 'fx.spec': 70, 'vis.outline': '#f97316' }],
         ['Spectrum', { 'fx.sky': '#a855f7', 'fx.spec': 100, 'vis.outline': '#a855f7' }]
-      ].forEach(([n, patch]) => {
+      ].forEach(function (pair) {
+        const n = pair[0], patch = pair[1];
         const b = el('button', 'btn', n);
         b.type = 'button';
         b.onclick = () => {
@@ -187,7 +230,6 @@
       card.append(w, row);
       return card;
     }
-
     const r = c.rows[0];
     const l = el('div', 'lbl');
     l.append(el('div', 'ctitle', r.label), el('div', 'cdesc', r.desc));
@@ -225,7 +267,6 @@
       track.append(el('div', 'rail'), fill, knob);
       const val = el('div', 'val');
       wrap.append(track, val);
-
       const paint = () => {
         const p = ((S[r.id] - r.min) / (r.max - r.min)) * 100;
         fill.style.width = p + '%';
@@ -326,7 +367,7 @@
       return;
     }
     if (id === 'cfg.del') {
-      if (['Legit', 'Rage', 'HvH'].includes(active)) { toast('Built-in configs cannot be deleted'); return; }
+      if (['Legit', 'Rage', 'HvH'].indexOf(active) >= 0) { toast('Built-in configs cannot be deleted'); return; }
       delete CFG[active];
       LS.setItem(K_C, JSON.stringify(CFG));
       active = Object.keys(CFG)[0];
@@ -341,7 +382,7 @@
   function doSave() {
     const n = mInput.value.trim();
     if (!n) { mInput.focus(); return; }
-    CFG[n] = { ...S };
+    CFG[n] = Object.assign({}, S);
     active = n;
     LS.setItem(K_C, JSON.stringify(CFG));
     LS.setItem(K_A, active);
@@ -374,19 +415,35 @@
         render();
         wm.classList.toggle('off', !S['misc.wm']);
         toast('Mod "' + (d.name || f.name) + '" loaded (' + n + ' values)');
-      } catch { toast('Invalid mod file'); }
+      } catch (e) { toast('Invalid mod file'); }
       modFile.value = '';
     };
     rd.readAsText(f);
   });
 
-  document.getElementById('minBtn').onclick = () => window.api.min();
-  document.getElementById('closeBtn').onclick = () => window.api.close();
+  if (hasBridge) {
+    document.getElementById('minBtn').onclick = () => window.api.min();
+    document.getElementById('closeBtn').onclick = () => window.api.close();
+  } else {
+    document.getElementById('minBtn').style.display = 'none';
+    document.getElementById('closeBtn').style.display = 'none';
+  }
 
-  // 起動時
-  Object.assign(S, CFG[active] || {});
-  save();
-  buildSide();
-  render();
-  wm.classList.toggle('off', !S['misc.wm']);
+  if (window.api && window.api.onStatus) {
+    window.api.onStatus(s => {
+      if (!statEl) return;
+      statEl.textContent = s.text;
+      statEl.classList.toggle('on', s.attached);
+    });
+  }
+
+  try {
+    Object.assign(S, CFG[active] || {});
+    save();
+    buildSide();
+    render();
+    wm.classList.toggle('off', !S['misc.wm']);
+  } catch (e) {
+    fatal(e && e.stack ? e.stack : e);
+  }
 })();
