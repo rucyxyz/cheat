@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+(function () {
+  const c = document.getElementById('c');
+  const g = c.getContext('2d');
+  let W = 0, H = 0;
+  let hue = 0;
+
+  function size() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    const d = window.devicePixelRatio || 1;
+    c.width = W * d;
+    c.height = H * d;
+    c.style.width = W + 'px';
+    c.style.height = H + 'px';
+    g.setTransform(d, 0, 0, d, 0, 0);
+  }
+  size();
+  window.addEventListener('resize', size);
+
+  function shift(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) + amt, gg = ((n >> 8) & 255) + amt, b = (n & 255) + amt;
+    r = Math.max(0, Math.min(255, r));
+    gg = Math.max(0, Math.min(255, gg));
+    b = Math.max(0, Math.min(255, b));
+    return 'rgb(' + r + ',' + gg + ',' + b + ')';
+  }
+
+  window.api.onFrame(d => {
+    g.clearRect(0, 0, W, H);
+    hue = (hue + 1) % 360;
+
+    const cfg = d.cfg;
+    const base = cfg.spec > 0 ? 'hsl(' + hue + ',90%,60%)' : cfg.outline;
+
+    if (cfg.enable) {
+      if (cfg.snap && d.localScreen) {
+        g.strokeStyle = cfg.ribbon;
+        g.globalAlpha = .35;
+        g.lineWidth = 1;
+        g.beginPath();
+        for (const p of d.players) {
+          if (p.local) continue;
+          g.moveTo(d.localScreen.x, d.localScreen.y);
+          g.lineTo(p.x, p.y);
+        }
+        g.stroke();
+        g.globalAlpha = 1;
+      }
+
+      for (const p of d.players) {
+        if (p.local) continue;
+
+        if (cfg.sil) {
+          g.fillStyle = shift(cfg.fresnel, -40);
+          g.globalAlpha = .12;
+          g.fillRect(p.bx, p.by, p.bw, p.bh);
+          g.globalAlpha = 1;
+        }
+
+        if (cfg.box) {
+          g.strokeStyle = base;
+          g.lineWidth = 1.4;
+          g.strokeRect(p.bx, p.by, p.bw, p.bh);
+        }
+
+        if (cfg.hpBar) {
+          const w = 3;
+          const hh = (p.hp / 100) * p.bh;
+          g.fillStyle = 'rgba(0,0,0,.55)';
+          g.fillRect(p.bx - 6, p.by, w, p.bh);
+          g.fillStyle = p.hp > 60 ? '#22c55e' : p.hp > 30 ? '#eab308' : '#ef4444';
+          g.fillRect(p.bx - 6, p.by + (p.bh - hh), w, hh);
+        }
+      }
+    }
+
+    // FOV
+    if (d.fovPx) {
+      g.strokeStyle = cfg.ribbon;
+      g.globalAlpha = .18;
+      g.lineWidth = 1;
+      g.beginPath();
+      g.arc(d.cx, d.cy, d.fovPx, 0, Math.PI * 2);
+      g.stroke();
+      g.globalAlpha = 1;
+    }
+
+    // レーダー
+    if (cfg.radar && d.localScreen) {
+      const r = 62;
+      const px = 24 + r;
+      const py = H - 24 - r;
+      g.strokeStyle = cfg.ribbon;
+      g.globalAlpha = .35;
+      g.lineWidth = 1;
+      g.beginPath();
+      g.arc(px, py, r, 0, Math.PI * 2);
+      g.stroke();
+      g.globalAlpha = 1;
+      for (const p of d.players) {
+        if (p.local) continue;
+        const dx = Math.max(-r, Math.min(r, (p.x - d.cx) / 8));
+        const dy = Math.max(-r, Math.min(r, (p.y - d.cy) / 8));
+        g.fillStyle = cfg.outline;
+        g.beginPath();
+        g.arc(px + dx, py + dy, 2.2, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+
+    if (cfg.wm) {
+      g.fillStyle = 'rgba(168,85,247,.75)';
+      g.font = '11px Segoe UI, sans-serif';
+      g.textAlign = 'right';
+      g.fillText('cheat 1.0.0', W - 14, H - 14);
+    }
+  });
+})();
+</script>
+</body>
+</html>
