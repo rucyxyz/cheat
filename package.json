@@ -1,31 +1,16 @@
 {
   "name": "cheat",
   "version": "1.0.0",
-  "description": "Electron settings panel with aimbot / ESP / visuals tabs, configs and mod loading",
+  "description": "External CS2 overlay and settings panel",
   "main": "main.js",
   "author": "rucyxyz",
   "license": "MIT",
-  "homepage": "https://github.com/rucyxyz/cheat",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rucyxyz/cheat.git"
-  },
-  "bugs": {
-    "url": "https://github.com/rucyxyz/cheat/issues"
-  },
-  "keywords": [
-    "electron",
-    "cheat",
-    "settings-ui",
-    "overlay",
-    "aimware"
-  ],
-  "engines": {
-    "node": ">=20"
-  },
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win nsis portable"
+  },
+  "dependencies": {
+    "koffi": "^2.9.2"
   },
   "devDependencies": {
     "electron": "^31.3.0",
@@ -34,27 +19,15 @@
   "build": {
     "appId": "io.github.rucyxyz.cheat",
     "productName": "cheat",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "renderer/**/*"
-    ],
-    "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ]
-    },
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js", "offsets.js", "renderer/**/*"],
+    "asarUnpack": ["**/node_modules/koffi/**"],
+    "win": { "target": ["nsis", "portable"] },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "artifactName": "cheat-${version}-win-${arch}-setup.${ext}"
     },
-    "portable": {
-      "artifactName": "cheat-${version}-win-${arch}-portable.${ext}"
-    }
+    "portable": { "artifactName": "cheat-${version}-win-${arch}-portable.${ext}" }
   }
 }
