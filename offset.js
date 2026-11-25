@@ -1,44 +1,56 @@
-// CS2 offsets — 2026-11
-// ゲームが更新されたらここだけ直す。他は触らなくてよい。
+// Valorant (UE4) 構造オフセット
+// パッチで動いたら数値だけ差し替える。UWorld は 0 にしておけば自動スキャン。
 module.exports = {
-  process: 'cs2.exe',
+  process: 'VALORANT-Win64-Shipping.exe',
   modules: {
-    client: 'client.dll',
-    engine: 'engine2.dll'
+    client: 'VALORANT-Win64-Shipping.exe'
   },
 
-  // client.dll
-  dwEntityList: 0x1A2A3B0,
-  dwLocalPlayerPawn: 0x1A5B4A0,
-  dwViewMatrix: 0x1A6B4D0,
+  // 0 = 自動スキャン（推奨）
+  dwUWorld: 0,
 
-  // C_BaseEntity / C_CSPlayerPawn
-  m_iHealth: 0x34C,
-  m_iTeamNum: 0x3E3,
-  m_lifeState: 0x338,
-  m_pGameSceneNode: 0x328,
-  m_iIDEntIndex: 0x33B8,
+  // UWorld
+  persistentLevel: 0x30,
+  owningGameInstance: 0x1B8,
 
-  // CGameSceneNode / CModelState
-  m_modelState: 0x170,
-  m_vecAbsOrigin: 0x80,
-  boneArray: 0x80,
-  boneStride: 32,
-  bonePos: 0x0C,
+  // ULevel
+  actors: 0xA0,
 
-  // ボーン番号
-  bones: {
-    head: 6,
-    neck: 5,
-    pelvis: 1,
-    footL: 76,
-    footR: 79
-  },
+  // TArray
+  arrayCount: 0x8,
 
-  // エンティティリストのストライド
-  entStride: 0x78,
-  entChunkShift: 9,
-  entChunkSize: 0x10,
+  // UGameInstance
+  localPlayers: 0x38,
+
+  // ULocalPlayer
+  localPlayerController: 0x30,
+
+  // APlayerController
+  acknowledgedPawn: 0x4C0,
+  playerCameraManager: 0x4A8,
+  controlRotation: 0x3B0,
+
+  // APlayerCameraManager -> FCameraCacheEntry
+  cameraCache: 0x1A0,
+  povLocation: 0x10,
+  povRotation: 0x1C,
+  povFov: 0x28,
+
+  // AActor / USceneComponent
+  rootComponent: 0x1C8,
+  relativeLocation: 0x1D8,
+
+  // APawn
+  playerState: 0x2A8,
+  health: 0x1A0,
+
+  // APlayerState
+  teamNum: 0x4B0,
+
+  // 身体の高さ（ルートからの相対）
+  headOffset: 68,
+  footOffset: 3,
+  maxDistance: 25000,
 
   // 仮想キーコード
   aimKey: 0x05,   // マウス4
