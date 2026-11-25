@@ -38,14 +38,14 @@
     return 'rgb(' + r + ',' + gg + ',' + b + ')';
   }
 
-  window.api.onFrame(d => {
+  function draw(d) {
     g.clearRect(0, 0, W, H);
     hue = (hue + 1) % 360;
 
-    const cfg = d.cfg;
-    const base = cfg.spec > 0 ? 'hsl(' + hue + ',90%,60%)' : cfg.outline;
+    const cfg = d.cfg || {};
+    const base = cfg.spec > 0 ? 'hsl(' + hue + ',90%,60%)' : (cfg.outline || '#a855f7');
 
-    if (cfg.enable) {
+    if (cfg.enable && d.players) {
       if (cfg.snap && d.localScreen) {
         g.strokeStyle = cfg.ribbon;
         g.globalAlpha = .35;
@@ -64,7 +64,7 @@
         if (p.local) continue;
 
         if (cfg.sil) {
-          g.fillStyle = shift(cfg.fresnel, -40);
+          g.fillStyle = shift(cfg.fresnel || '#ec4899', -40);
           g.globalAlpha = .12;
           g.fillRect(p.bx, p.by, p.bw, p.bh);
           g.globalAlpha = 1;
@@ -87,9 +87,8 @@
       }
     }
 
-    // FOV
     if (d.fovPx) {
-      g.strokeStyle = cfg.ribbon;
+      g.strokeStyle = cfg.ribbon || '#a855f7';
       g.globalAlpha = .18;
       g.lineWidth = 1;
       g.beginPath();
@@ -98,12 +97,11 @@
       g.globalAlpha = 1;
     }
 
-    // レーダー
-    if (cfg.radar && d.localScreen) {
+    if (cfg.radar && d.localScreen && d.players) {
       const r = 62;
       const px = 24 + r;
       const py = H - 24 - r;
-      g.strokeStyle = cfg.ribbon;
+      g.strokeStyle = cfg.ribbon || '#a855f7';
       g.globalAlpha = .35;
       g.lineWidth = 1;
       g.beginPath();
@@ -114,7 +112,7 @@
         if (p.local) continue;
         const dx = Math.max(-r, Math.min(r, (p.x - d.cx) / 8));
         const dy = Math.max(-r, Math.min(r, (p.y - d.cy) / 8));
-        g.fillStyle = cfg.outline;
+        g.fillStyle = cfg.outline || '#a855f7';
         g.beginPath();
         g.arc(px + dx, py + dy, 2.2, 0, Math.PI * 2);
         g.fill();
@@ -127,7 +125,13 @@
       g.textAlign = 'right';
       g.fillText('cheat 1.0.0', W - 14, H - 14);
     }
-  });
+  }
+
+  if (window.api && window.api.onFrame) {
+    window.api.onFrame(draw);
+  } else {
+    document.body.style.background = 'transparent';
+  }
 })();
 </script>
 </body>
