@@ -1,7 +1,5 @@
 (function () {
   const statEl = document.getElementById('stat');
-  if (statEl) statEl.textContent = 'app.js 読込済み';
-  console.log('app.js loaded');
 
   function fatal(msg) {
     const bar = document.getElementById('err');
@@ -74,7 +72,7 @@
       { rows: [{ t: 'tog', id: 'esp.box', label: '2D Box', desc: 'Outline drawn around every enemy' }] },
       { rows: [{ t: 'tog', id: 'esp.sil', label: 'Silhouette', desc: 'Fill enemies through walls' }] },
       { rows: [{ t: 'tog', id: 'esp.hp', label: 'Health', desc: 'Remaining HP above each player' }] },
-      { rows: [{ t: 'tog', id: 'esp.radar', label: 'Off-screen positions on a minimap' }] },
+      { rows: [{ t: 'tog', id: 'esp.radar', label: 'Radar', desc: 'Off-screen positions on a minimap' }] },
       { rows: [{ t: 'tog', id: 'esp.snap', label: 'Snaplines', desc: 'Line from you to each enemy' }] }
     ]},
     { id: 'vis', title: 'Visuals', sub: 'Colour Settings', icon: I.vis, head: 'Colour Settings', cards: [
@@ -87,7 +85,7 @@
     ]},
     { id: 'misc', title: 'Misc', sub: 'Misc Settings', icon: I.misc, head: 'Misc Settings', cards: [
       { rows: [{ t: 'tog', id: 'misc.tracer', label: 'Bullet Tracers', desc: 'Draw the path of every shot' }] },
-      { rows: [{ t: 'tog', id: 'misc.skins', label: 'CS2 Skins', desc: 'Swap weapons for CS2 finishes' }] },
+      { rows: [{ t: 'tog', id: 'misc.skins', label: 'Valorant Skins', desc: 'Swap weapons for store finishes' }] },
       { rows: [{ t: 'tog', id: 'misc.bhop', label: 'Bunny Hop', desc: 'Auto-jump on landing' }] },
       { rows: [{ t: 'tog', id: 'misc.flash', label: 'Anti-Flash', desc: 'Ignore flashbang blindness' }] },
       { rows: [{ t: 'tog', id: 'misc.wm', label: 'Watermark', desc: 'Show the build in the corner' }] },
@@ -114,6 +112,7 @@
       { presets: true }
     ]},
     { id: 'setup', title: 'Setup', sub: 'Config & Mods', icon: I.setup, head: 'Config & Mods', cards: [
+      { rows: [{ t: 'diag' }] },
       { rows: [{ t: 'cfgsel' }] },
       { rows: [{ t: 'act', id: 'cfg.save', label: 'Save Config', desc: 'Store the current setup', text: 'Save' }] },
       { rows: [{ t: 'act', id: 'cfg.load', label: 'Load Config', desc: 'Restore a saved setup', text: 'Load' }] },
@@ -123,7 +122,7 @@
   ];
 
   const DEFAULTS = {
-    'aim.enable': true, 'aim.fov': 98, 'aim.delay': 35, 'aim.pred': false, 'aim.spread': true,
+    'aim.enable': true, 'aim.fov': 8, 'aim.delay': 20, 'aim.pred': false, 'aim.spread': true,
     'esp.enable': true, 'esp.box': true, 'esp.sil': true, 'esp.hp': true, 'esp.radar': false, 'esp.snap': false,
     'vis.outline': '#a855f7', 'vis.weapon': '#22d3ee', 'vis.fresnel': '#ec4899', 'vis.occ': '#ef4444', 'vis.cham': '#22c55e', 'vis.self': '#f59e0b',
     'misc.tracer': true, 'misc.skins': false, 'misc.bhop': true, 'misc.flash': true, 'misc.wm': true, 'misc.ribbon': '#a855f7',
@@ -133,9 +132,9 @@
   };
 
   const BUILTIN = {
-    Legit: { 'aim.fov': 98, 'aim.delay': 35, 'aim.pred': false, 'aim.spread': true, 'esp.box': true, 'esp.sil': false, 'esp.hp': true, 'tp.enable': false },
-    Rage: { 'aim.fov': 24, 'aim.delay': 0, 'aim.pred': true, 'aim.spread': true, 'esp.box': true, 'esp.sil': true, 'esp.hp': false, 'tp.enable': false },
-    HvH: { 'aim.fov': 180, 'aim.delay': 10, 'aim.pred': true, 'aim.spread': true, 'esp.box': true, 'esp.sil': true, 'esp.snap': true, 'esp.radar': true, 'tp.enable': false }
+    Legit: { 'aim.fov': 6, 'aim.delay': 25, 'aim.pred': false, 'aim.spread': true, 'esp.box': true, 'esp.sil': false, 'esp.hp': true, 'tp.enable': false },
+    Rage: { 'aim.fov': 25, 'aim.delay': 0, 'aim.pred': true, 'aim.spread': true, 'esp.box': true, 'esp.sil': true, 'esp.hp': false, 'tp.enable': false },
+    HvH: { 'aim.fov': 180, 'aim.delay': 5, 'aim.pred': true, 'aim.spread': true, 'esp.box': true, 'esp.sil': true, 'esp.snap': true, 'esp.radar': true, 'tp.enable': false }
   };
 
   const K_S = 'settings', K_C = 'configs', K_A = 'active', K_U = 'unlocked', K_T = 'tab';
@@ -155,7 +154,7 @@
     } catch (e) { return fb; }
   };
 
-  let S = readJSON(K_S, Object.assign({}, DEFAULTS));
+  let S = Object.assign({}, DEFAULTS, readJSON(K_S, {}));
   let CFG = readJSON(K_C, JSON.parse(JSON.stringify(BUILTIN)));
   let active = LS.getItem(K_A) || 'Legit';
   if (!CFG[active]) active = Object.keys(CFG)[0];
@@ -232,7 +231,7 @@
     }
     const r = c.rows[0];
     const l = el('div', 'lbl');
-    l.append(el('div', 'ctitle', r.label), el('div', 'cdesc', r.desc));
+    l.append(el('div', 'ctitle', r.label || ''), el('div', 'cdesc', r.desc || ''));
     card.append(l, control(r));
     return card;
   }
@@ -323,6 +322,14 @@
       if (r.id === 'skin.unlock' && unlocked) { b.textContent = 'Unlocked'; b.disabled = true; }
       b.onclick = () => action(r.id, b);
       return b;
+    }
+
+    if (r.t === 'diag') {
+      const box = el('div', 'val');
+      box.id = 'diag';
+      box.style.width = 'auto';
+      box.textContent = '待機中';
+      return box;
     }
 
     if (r.t === 'cfgsel') {
@@ -431,15 +438,22 @@
 
   if (window.api && window.api.onStatus) {
     window.api.onStatus(s => {
-      if (!statEl) return;
-      statEl.textContent = s.text;
-      statEl.classList.toggle('on', s.attached);
+      if (statEl) {
+        statEl.textContent = s.text;
+        statEl.classList.toggle('on', s.attached);
+      }
+      const d = document.getElementById('diag');
+      if (d && s.diag) d.textContent = s.diag;
+    });
+  }
+  if (window.api && window.api.onDiag) {
+    window.api.onDiag(text => {
+      const d = document.getElementById('diag');
+      if (d) d.textContent = text;
     });
   }
 
   try {
-    Object.assign(S, CFG[active] || {});
-    save();
     buildSide();
     render();
     wm.classList.toggle('off', !S['misc.wm']);
