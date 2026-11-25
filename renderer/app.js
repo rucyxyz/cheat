@@ -1,5 +1,9 @@
 (function () {
   const statEl = document.getElementById('stat');
+  const probe = document.getElementById('probe');
+  document.addEventListener('mousemove', e => {
+    if (probe) probe.textContent = e.clientX + ',' + e.clientY;
+  }, { passive: true });
 
   function fatal(msg) {
     const bar = document.getElementById('err');
