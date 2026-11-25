@@ -1,7 +1,7 @@
 {
   "name": "cheat",
   "version": "1.0.0",
-  "description": "External CS2 overlay and settings panel",
+  "description": "External Valorant overlay and settings panel",
   "main": "main.js",
   "author": "rucyxyz",
   "license": "MIT",
@@ -20,7 +20,7 @@
     "appId": "io.github.rucyxyz.cheat",
     "productName": "cheat",
     "directories": { "output": "dist" },
-    "files": ["main.js", "preload.js", "offsets.js", "renderer/**/*"],
+    "files": ["main.js", "preload.js", "game.js", "offsets.js", "renderer/**/*"],
     "asarUnpack": ["**/node_modules/koffi/**"],
     "win": { "target": ["nsis", "portable"] },
     "nsis": {
