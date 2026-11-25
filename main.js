@@ -2,29 +2,10 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const koffi = require('koffi');
+const game = require('./game');
 const OFF = require('./offsets');
 
-const k32 = koffi.load('kernel32.dll');
-const u32 = koffi.load('user32.dll');
-
-const CreateToolhelp32Snapshot = k32.func('uint64 CreateToolhelp32Snapshot(uint32, uint32)');
-const Process32First = k32.func('bool Process32First(uint64, _Out_ uint8*)');
-const Process32Next = k32.func('bool Process32Next(uint64, _Out_ uint8*)');
-const Module32First = k32.func('bool Module32First(uint64, _Out_ uint8*)');
-const Module32Next = k32.func('bool Module32Next(uint64, _Out_ uint8*)');
-const OpenProcess = k32.func('uint64 OpenProcess(uint32, bool, uint32)');
-const CloseHandle = k32.func('bool CloseHandle(uint64)');
-const ReadProcessMemory = k32.func('bool ReadProcessMemory(uint64, uint64, _Out_ uint8*, uint64, _Out_ uint64*)');
-const GetAsyncKeyState = u32.func('int16 GetAsyncKeyState(int32)');
-const mouse_event = u32.func('void mouse_event(uint32, int32, int32, uint32, uint64)');
-
-const TH32CS_SNAPPROCESS = 0x2;
-const TH32CS_SNAPMODULE = 0x8;
-const TH32CS_SNAPMODULE32 = 0x10;
-const PROCESS_VM_READ = 0x10;
-const PROCESS_VM_WRITE = 0x20;
-const PROCESS_VM_OPERATION = 0x8;
-const PROCESS_QUERY_INFORMATION = 0x400;
+const GetAsyncKeyState = koffi.load('user32.dll').func('int16 GetAsyncKeyState(int32)');
 
 // ---------- 保存 ----------
 const storePath = () => path.join(app.getPath('userData'), 'settings.json');
@@ -55,94 +36,17 @@ ipcMain.on('store:set', (e, key, value) => {
   if (key === 'settings') refreshLive();
 });
 
-// ---------- メモリ ----------
-function rd(h, addr, size) {
-  const buf = Buffer.alloc(size);
-  const n = Buffer.alloc(8);
-  if (!ReadProcessMemory(h, BigInt(addr), buf, BigInt(size), n)) return null;
-  return buf;
-}
-const rd32 = (h, a) => { const b = rd(h, a, 4); return b ? b.readInt32LE(0) : 0; };
-const rd8 = (h, a) => { const b = rd(h, a, 1); return b ? b.readUInt8(0) : 0; };
-const rdf = (h, a) => { const b = rd(h, a, 4); return b ? b.readFloatLE(0) : 0; };
-const rd64 = (h, a) => { const b = rd(h, a, 8); return b ? b.readBigUInt64LE(0) : 0n; };
-const rdv3 = (h, a) => {
-  const b = rd(h, a, 12);
-  return b ? { x: b.readFloatLE(0), y: b.readFloatLE(4), z: b.readFloatLE(8) } : null;
-};
-
-function findPid(name) {
-  const snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-  if (!snap || snap === 0xFFFFFFFFFFFFFFFFn) return 0;
-  const buf = Buffer.alloc(304);
-  buf.writeUInt32LE(304, 0);
-  let pid = 0;
-  if (Process32First(snap, buf)) {
-    do {
-      const exe = buf.toString('utf8', 44, 304).split('\0')[0];
-      if (exe.toLowerCase() === name.toLowerCase()) { pid = buf.readUInt32LE(8); break; }
-    } while (Process32Next(snap, buf));
-  }
-  CloseHandle(snap);
-  return pid;
-}
-
-function findModule(pid, name) {
-  const snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid);
-  if (!snap || snap === 0xFFFFFFFFFFFFFFFFn) return 0n;
-  const buf = Buffer.alloc(568);
-  buf.writeUInt32LE(568, 0);
-  let base = 0n;
-  if (Module32First(snap, buf)) {
-    do {
-      const mod = buf.toString('utf8', 48, 304).split('\0')[0];
-      if (mod.toLowerCase() === name.toLowerCase()) { base = buf.readBigUInt64LE(24); break; }
-    } while (Module32Next(snap, buf));
-  }
-  CloseHandle(snap);
-  return base;
-}
-
-let hProc = 0n;
-let clientBase = 0n;
-let attached = false;
-
-function attach() {
-  const pid = findPid(OFF.process);
-  if (!pid) { attached = false; return false; }
-  const h = OpenProcess(PROCESS_VM_READ | PROCESS_VM_OPERATION | PROCESS_QUERY_INFORMATION, false, pid);
-  if (!h) { attached = false; return false; }
-  const base = findModule(pid, OFF.modules.client);
-  if (!base) { CloseHandle(h); attached = false; return false; }
-  hProc = h;
-  clientBase = base;
-  attached = true;
-  return true;
-}
-
-function bonePos(h, pawn, idx) {
-  const node = rd64(h, pawn + BigInt(OFF.m_pGameSceneNode));
-  if (!node) return null;
-  const arr = rd64(h, node + BigInt(OFF.m_modelState) + BigInt(OFF.boneArray));
-  if (!arr) return null;
-  return rdv3(h, arr + BigInt(idx * OFF.boneStride) + BigInt(OFF.bonePos));
-}
-
-function project(m, x, y, z, w, h) {
-  const cw = m[12] * x + m[13] * y + m[14] * z + m[15];
-  if (cw < 0.01) return null;
-  const cx = m[0] * x + m[1] * y + m[2] * z + m[3];
-  const cy = m[4] * x + m[5] * y + m[6] * z + m[7];
-  return {
-    x: (w / 2) * (1 + cx / cw),
-    y: (h / 2) * (1 - cy / cw)
-  };
-}
-
 // ---------- ウィンドウ ----------
 let panelWin = null;
 let overlayWin = null;
 let overlayHidden = false;
+let timer = null;
+
+function passThrough() {
+  if (overlayWin && !overlayWin.isDestroyed()) {
+    overlayWin.setIgnoreMouseEvents(true, { forward: true });
+  }
+}
 
 function createPanel() {
   panelWin = new BrowserWindow({
@@ -156,131 +60,110 @@ function createPanel() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      backgroundThrottling: false
     }
   });
+  panelWin.setMenuBarVisibility(false);
   panelWin.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  panelWin.once('ready-to-show', () => panelWin.show());
+  panelWin.once('ready-to-show', () => {
+    panelWin.show();
+    panelWin.focus();
+    passThrough();
+  });
+  panelWin.webContents.on('did-fail-load', (_, code, desc) => {
+    console.error('renderer load failed', code, desc);
+  });
+  panelWin.webContents.on('console-message', (_, level, msg) => {
+    if (level >= 2) console.error('[renderer]', msg);
+  });
+  panelWin.webContents.on('before-input-event', (e, input) => {
+    if (input.type === 'keyDown' && input.key === 'F12') {
+      panelWin.webContents.toggleDevTools();
+    }
+  });
+  panelWin.on('focus', passThrough);
   panelWin.on('closed', () => app.quit());
 }
 
 function createOverlay() {
+  const disp = screen.getPrimaryDisplay();
   overlayWin = new BrowserWindow({
-    fullscreen: true,
+    x: disp.bounds.x,
+    y: disp.bounds.y,
+    width: disp.bounds.width,
+    height: disp.bounds.height,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
     focusable: false,
     hasShadow: false,
+    resizable: false,
+    movable: false,
     show: false,
+    fullscreenable: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      backgroundThrottling: false
     }
   });
-  overlayWin.setIgnoreMouseEvents(true, { forward: true });
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  overlayWin.setIgnoreMouseEvents(true, { forward: true });
   overlayWin.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
-  overlayWin.once('ready-to-show', () => overlayWin.showInactive());
+  overlayWin.webContents.on('did-finish-load', passThrough);
+  overlayWin.once('ready-to-show', () => {
+    if (!overlayHidden) overlayWin.showInactive();
+    passThrough();
+  });
+  overlayWin.on('show', passThrough);
+  overlayWin.webContents.on('did-fail-load', (_, code, desc) => {
+    console.error('overlay load failed', code, desc);
+  });
 }
 
 ipcMain.on('win:min', e => BrowserWindow.fromWebContents(e.sender)?.minimize());
 ipcMain.on('win:close', e => BrowserWindow.fromWebContents(e.sender)?.close());
 
 // ---------- ループ ----------
-const prevPos = new Map();
 let lastStatus = 0;
+let lastText = '';
+let lastPass = 0;
 
-function sendStatus() {
+function status(attached) {
   const now = Date.now();
-  if (now - lastStatus < 500) return;
+  const text = attached ? 'VALORANT 接続中' : 'VALORANT 待機中';
+  if (now - lastStatus < 500 && text === lastText) return;
   lastStatus = now;
-  const text = attached ? 'cs2.exe 接続中' : 'cs2.exe 待機中';
-  if (panelWin) panelWin.webContents.send('status', { attached, text });
+  lastText = text;
+  if (panelWin && !panelWin.isDestroyed()) {
+    panelWin.webContents.send('status', { attached, text, diag: game.diag });
+  }
 }
 
-function frame() {
+function loop() {
   try {
-    if (!attached && !attach()) { sendStatus(); return; }
-    sendStatus();
+    const now = Date.now();
+    if (now - lastPass > 1000) { lastPass = now; passThrough(); }
 
-    const disp = screen.getPrimaryDisplay().bounds;
-    const W = disp.width;
-    const H = disp.height;
+    const disp = screen.getPrimaryDisplay();
+    const W = disp.bounds.width;
+    const H = disp.bounds.height;
+    const res = game.frame(live, W, H);
+    status(res.attached);
 
-    const mtx = rd(hProc, clientBase + BigInt(OFF.dwViewMatrix), 64);
-    if (!mtx) { attached = false; return; }
-    const m = [];
-    for (let i = 0; i < 16; i++) m.push(mtx.readFloatLE(i * 4));
-
-    const localPawn = rd64(hProc, clientBase + BigInt(OFF.dwLocalPlayerPawn));
-    if (!localPawn) return;
-    const localTeam = rd8(hProc, localPawn + BigInt(OFF.m_iTeamNum));
-    const localNode = rd64(hProc, localPawn + BigInt(OFF.m_pGameSceneNode));
-    const localOrigin = localNode ? rdv3(hProc, localNode + BigInt(OFF.m_vecAbsOrigin)) : null;
-
-    const list = rd64(hProc, clientBase + BigInt(OFF.dwEntityList));
-    const players = [];
-    let best = null;
-    const cx = W / 2;
-    const cy = H / 2;
-    const fovPx = ((live['aim.fov'] || 98) / 180) * H;
-
-    for (let i = 1; i < 64 && list; i++) {
-      const chunk = rd64(hProc, list + BigInt(OFF.entChunkSize * (i >> OFF.entChunkShift)));
-      if (!chunk) continue;
-      const pawn = rd64(hProc, chunk + BigInt(OFF.entStride * (i & ((1 << OFF.entChunkShift) - 1))));
-      if (!pawn) continue;
-
-      const hp = rd32(hProc, pawn + BigInt(OFF.m_iHealth));
-      if (hp < 1 || hp > 200) continue;
-      const life = rd8(hProc, pawn + BigInt(OFF.m_lifeState));
-      if (life !== 0) continue;
-      const team = rd8(hProc, pawn + BigInt(OFF.m_iTeamNum));
-
-      const head = bonePos(hProc, pawn, OFF.bones.head);
-      const foot = bonePos(hProc, pawn, OFF.bones.footL);
-      if (!head || !foot) continue;
-
-      const hs = project(m, head.x, head.y, head.z, W, H);
-      const fs = project(m, foot.x, foot.y, foot.z, W, H);
-      if (!hs || !fs) continue;
-
-      const hgt = Math.abs(fs.y - hs.y);
-      if (hgt < 6) continue;
-
-      const p = {
-        x: hs.x,
-        y: hs.y,
-        bx: hs.x - hgt / 4,
-        by: hs.y,
-        bw: hgt / 2,
-        bh: hgt,
-        hp,
-        team,
-        local: team === localTeam
-      };
-      players.push(p);
-
-      if (!p.local && hs.x > 0 && hs.x < W && hs.y > 0 && hs.y < H) {
-        const d = Math.hypot(hs.x - cx, hs.y - cy);
-        if (d < fovPx && (!best || d < best.d)) best = { d, x: hs.x, y: hs.y, p };
-      }
-
-      prevPos.set(pawn, { x: head.x, y: head.y, z: head.z });
+    if (panelWin && !panelWin.isDestroyed()) {
+      panelWin.webContents.send('diag', res.diag || '');
     }
 
-    let localScreen = null;
-    if (localOrigin) {
-      const ls = project(m, localOrigin.x, localOrigin.y, localOrigin.z, W, H);
-      if (ls) localScreen = ls;
-    }
-
-    if (overlayWin && !overlayHidden) {
+    if (overlayWin && !overlayWin.isDestroyed() && !overlayHidden && res.players) {
       overlayWin.webContents.send('frame', {
-        W, H, cx, cy, fovPx, players, localScreen,
+        W, H,
+        cx: res.cx, cy: res.cy, fovPx: res.fovPx,
+        players: res.players,
+        localScreen: res.localScreen,
         cfg: {
           enable: live['esp.enable'] !== false,
           box: live['esp.box'] !== false,
@@ -288,61 +171,50 @@ function frame() {
           hpBar: live['esp.hp'] !== false,
           snap: live['esp.snap'] === true,
           radar: live['esp.radar'] === true,
-          tracer: live['misc.tracer'] === true,
           wm: live['misc.wm'] !== false,
           outline: live['vis.outline'] || '#a855f7',
           fresnel: live['vis.fresnel'] || '#ec4899',
-          weapon: live['vis.weapon'] || '#22d3ee',
           ribbon: live['misc.ribbon'] || '#a855f7',
           spec: live['fx.spec'] || 0
         }
       });
     }
-
-    // ---------- エイム ----------
-    if (live['aim.enable'] && best && (GetAsyncKeyState(OFF.aimKey) & 0x8000)) {
-      const delay = live['aim.delay'] || 0;
-      const smooth = 1 + delay / 20;
-      const pred = live['aim.pred'] === true;
-      let tx = best.x;
-      let ty = best.y;
-      if (pred) {
-        ty -= best.p.bh * 0.08;
-      }
-      const dx = Math.round((tx - cx) / smooth);
-      const dy = Math.round((ty - cy) / smooth);
-      if (dx || dy) mouse_event(0x0001, dx, dy, 0, 0n);
-    }
   } catch (e) {
-    attached = false;
+    console.error(e);
+    game.detach();
   }
 }
 
 // ---------- 起動 ----------
-let timer = null;
 let lastToggle = false;
 
 app.whenReady().then(() => {
   refreshLive();
   createPanel();
   createOverlay();
-
-  timer = setInterval(frame, 16);
+  timer = setInterval(loop, 16);
 
   setInterval(() => {
     const down = (GetAsyncKeyState(OFF.toggleKey) & 0x8000) !== 0;
     if (down && !lastToggle) {
       overlayHidden = !overlayHidden;
       if (overlayHidden) {
-        if (overlayWin) overlayWin.hide();
-        if (panelWin) { panelWin.show(); panelWin.focus(); }
+        if (overlayWin && !overlayWin.isDestroyed()) overlayWin.hide();
+        if (panelWin && !panelWin.isDestroyed()) { panelWin.show(); panelWin.focus(); }
       } else {
-        if (panelWin) panelWin.hide();
-        if (overlayWin) overlayWin.showInactive();
+        if (panelWin && !panelWin.isDestroyed()) panelWin.hide();
+        if (overlayWin && !overlayWin.isDestroyed()) overlayWin.showInactive();
+        passThrough();
       }
     }
     lastToggle = down;
   }, 40);
 });
 
-app.on('window-all-closed', () => app.quit());
+process.on('uncaughtException', e => console.error('uncaught', e));
+
+app.on('window-all-closed', () => {
+  if (timer) clearInterval(timer);
+  game.detach();
+  app.quit();
+});
