@@ -39,7 +39,7 @@ ipcMain.on('store:set', (e, key, value) => {
 // ---------- ウィンドウ ----------
 let panelWin = null;
 let overlayWin = null;
-let overlayHidden = false;
+let mode = 'panel';
 let timer = null;
 
 function passThrough() {
@@ -48,42 +48,25 @@ function passThrough() {
   }
 }
 
-function createPanel() {
-  panelWin = new BrowserWindow({
-    width: 940,
-    height: 640,
-    minWidth: 800,
-    minHeight: 540,
-    frame: false,
-    backgroundColor: '#09050f',
-    show: false,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      backgroundThrottling: false
+function setMode(next) {
+  mode = next;
+  if (mode === 'panel') {
+    if (overlayWin && !overlayWin.isDestroyed()) overlayWin.hide();
+    if (panelWin && !panelWin.isDestroyed()) {
+      panelWin.show();
+      panelWin.focus();
+      panelWin.setAlwaysOnTop(true, 'screen-saver');
     }
-  });
-  panelWin.setMenuBarVisibility(false);
-  panelWin.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  panelWin.once('ready-to-show', () => {
-    panelWin.show();
-    panelWin.focus();
-    passThrough();
-  });
-  panelWin.webContents.on('did-fail-load', (_, code, desc) => {
-    console.error('renderer load failed', code, desc);
-  });
-  panelWin.webContents.on('console-message', (_, level, msg) => {
-    if (level >= 2) console.error('[renderer]', msg);
-  });
-  panelWin.webContents.on('before-input-event', (e, input) => {
-    if (input.type === 'keyDown' && input.key === 'F12') {
-      panelWin.webContents.toggleDevTools();
+  } else {
+    if (panelWin && !panelWin.isDestroyed()) {
+      panelWin.setAlwaysOnTop(false);
+      panelWin.hide();
     }
-  });
-  panelWin.on('focus', passThrough);
-  panelWin.on('closed', () => app.quit());
+    if (overlayWin && !overlayWin.isDestroyed()) {
+      overlayWin.showInactive();
+      passThrough();
+    }
+  }
 }
 
 function createOverlay() {
@@ -114,14 +97,43 @@ function createOverlay() {
   overlayWin.setIgnoreMouseEvents(true, { forward: true });
   overlayWin.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
   overlayWin.webContents.on('did-finish-load', passThrough);
-  overlayWin.once('ready-to-show', () => {
-    if (!overlayHidden) overlayWin.showInactive();
-    passThrough();
-  });
   overlayWin.on('show', passThrough);
   overlayWin.webContents.on('did-fail-load', (_, code, desc) => {
     console.error('overlay load failed', code, desc);
   });
+}
+
+function createPanel() {
+  panelWin = new BrowserWindow({
+    width: 940,
+    height: 640,
+    minWidth: 800,
+    minHeight: 540,
+    frame: false,
+    backgroundColor: '#09050f',
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false
+    }
+  });
+  panelWin.setMenuBarVisibility(false);
+  panelWin.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  panelWin.once('ready-to-show', () => setMode('panel'));
+  panelWin.webContents.on('did-fail-load', (_, code, desc) => {
+    console.error('renderer load failed', code, desc);
+  });
+  panelWin.webContents.on('console-message', (_, level, msg) => {
+    if (level >= 2) console.error('[renderer]', msg);
+  });
+  panelWin.webContents.on('before-input-event', (e, input) => {
+    if (input.type === 'keyDown' && input.key === 'F12') {
+      panelWin.webContents.toggleDevTools();
+    }
+  });
+  panelWin.on('closed', () => app.quit());
 }
 
 ipcMain.on('win:min', e => BrowserWindow.fromWebContents(e.sender)?.minimize());
@@ -146,7 +158,7 @@ function status(attached) {
 function loop() {
   try {
     const now = Date.now();
-    if (now - lastPass > 1000) { lastPass = now; passThrough(); }
+    if (now - lastPass > 1000) { lastPass = now; if (mode === 'overlay') passThrough(); }
 
     const disp = screen.getPrimaryDisplay();
     const W = disp.bounds.width;
@@ -158,7 +170,7 @@ function loop() {
       panelWin.webContents.send('diag', res.diag || '');
     }
 
-    if (overlayWin && !overlayWin.isDestroyed() && !overlayHidden && res.players) {
+    if (mode === 'overlay' && overlayWin && !overlayWin.isDestroyed() && res.players) {
       overlayWin.webContents.send('frame', {
         W, H,
         cx: res.cx, cy: res.cy, fovPx: res.fovPx,
@@ -190,23 +202,13 @@ let lastToggle = false;
 
 app.whenReady().then(() => {
   refreshLive();
-  createPanel();
   createOverlay();
+  createPanel();
   timer = setInterval(loop, 16);
 
   setInterval(() => {
     const down = (GetAsyncKeyState(OFF.toggleKey) & 0x8000) !== 0;
-    if (down && !lastToggle) {
-      overlayHidden = !overlayHidden;
-      if (overlayHidden) {
-        if (overlayWin && !overlayWin.isDestroyed()) overlayWin.hide();
-        if (panelWin && !panelWin.isDestroyed()) { panelWin.show(); panelWin.focus(); }
-      } else {
-        if (panelWin && !panelWin.isDestroyed()) panelWin.hide();
-        if (overlayWin && !overlayWin.isDestroyed()) overlayWin.showInactive();
-        passThrough();
-      }
-    }
+    if (down && !lastToggle) setMode(mode === 'panel' ? 'overlay' : 'panel');
     lastToggle = down;
   }, 40);
 });
