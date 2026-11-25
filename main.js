@@ -50,6 +50,7 @@ function passThrough() {
 
 function setMode(next) {
   mode = next;
+  console.log('[mode]', mode);
   if (mode === 'panel') {
     if (overlayWin && !overlayWin.isDestroyed()) overlayWin.hide();
     if (panelWin && !panelWin.isDestroyed()) {
@@ -98,6 +99,7 @@ function createOverlay() {
   overlayWin.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
   overlayWin.webContents.on('did-finish-load', passThrough);
   overlayWin.on('show', passThrough);
+  overlayWin.on('hide', () => console.log('[overlay] hidden'));
   overlayWin.webContents.on('did-fail-load', (_, code, desc) => {
     console.error('overlay load failed', code, desc);
   });
@@ -128,6 +130,12 @@ function createPanel() {
   panelWin.webContents.on('console-message', (_, level, msg) => {
     if (level >= 2) console.error('[renderer]', msg);
   });
+  panelWin.webContents.on('input-event', (_, input) => {
+    if (input.type === 'mouseMove') return;
+    console.log('[input]', input.type, input.key || '');
+  });
+  panelWin.on('focus', () => console.log('[panel] focus'));
+  panelWin.on('blur', () => console.log('[panel] blur'));
   panelWin.webContents.on('before-input-event', (e, input) => {
     if (input.type === 'keyDown' && input.key === 'F12') {
       panelWin.webContents.toggleDevTools();
@@ -160,63 +168,4 @@ function loop() {
     const now = Date.now();
     if (now - lastPass > 1000) { lastPass = now; if (mode === 'overlay') passThrough(); }
 
-    const disp = screen.getPrimaryDisplay();
-    const W = disp.bounds.width;
-    const H = disp.bounds.height;
-    const res = game.frame(live, W, H);
-    status(res.attached);
-
-    if (panelWin && !panelWin.isDestroyed()) {
-      panelWin.webContents.send('diag', res.diag || '');
-    }
-
-    if (mode === 'overlay' && overlayWin && !overlayWin.isDestroyed() && res.players) {
-      overlayWin.webContents.send('frame', {
-        W, H,
-        cx: res.cx, cy: res.cy, fovPx: res.fovPx,
-        players: res.players,
-        localScreen: res.localScreen,
-        cfg: {
-          enable: live['esp.enable'] !== false,
-          box: live['esp.box'] !== false,
-          sil: live['esp.sil'] === true,
-          hpBar: live['esp.hp'] !== false,
-          snap: live['esp.snap'] === true,
-          radar: live['esp.radar'] === true,
-          wm: live['misc.wm'] !== false,
-          outline: live['vis.outline'] || '#a855f7',
-          fresnel: live['vis.fresnel'] || '#ec4899',
-          ribbon: live['misc.ribbon'] || '#a855f7',
-          spec: live['fx.spec'] || 0
-        }
-      });
-    }
-  } catch (e) {
-    console.error(e);
-    game.detach();
-  }
-}
-
-// ---------- 起動 ----------
-let lastToggle = false;
-
-app.whenReady().then(() => {
-  refreshLive();
-  createOverlay();
-  createPanel();
-  timer = setInterval(loop, 16);
-
-  setInterval(() => {
-    const down = (GetAsyncKeyState(OFF.toggleKey) & 0x8000) !== 0;
-    if (down && !lastToggle) setMode(mode === 'panel' ? 'overlay' : 'panel');
-    lastToggle = down;
-  }, 40);
-});
-
-process.on('uncaughtException', e => console.error('uncaught', e));
-
-app.on('window-all-closed', () => {
-  if (timer) clearInterval(timer);
-  game.detach();
-  app.quit();
-});
+    const disp =
