@@ -22,7 +22,10 @@
     "directories": { "output": "dist" },
     "files": ["main.js", "preload.js", "game.js", "offsets.js", "renderer/**/*"],
     "asarUnpack": ["**/node_modules/koffi/**"],
-    "win": { "target": ["nsis", "portable"] },
+    "win": {
+      "target": ["nsis", "portable"],
+      "requestedExecutionLevel": "requireAdministrator"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
