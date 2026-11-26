@@ -145,8 +145,18 @@ function createPanel() {
       nodeIntegration: false
     }
   });
+
   panelWin.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  panelWin.setAlwaysOnTop(true, 'floating');
   panelWin.once('ready-to-show', () => panelWin.show());
+
+  panelWin.webContents.on('before-input-event', (e, input) => {
+    if (input.type !== 'keyDown') return;
+    const f12 = input.key === 'F12';
+    const csi = input.control && input.shift && input.key.toLowerCase() === 'i';
+    if (f12 || csi) panelWin.webContents.toggleDevTools();
+  });
+
   panelWin.on('closed', () => app.quit());
 }
 
