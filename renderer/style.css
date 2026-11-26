@@ -34,7 +34,7 @@ body {
   padding: 0 6px 0 15px;
   background: #0a0612;
   border-bottom: 1px solid #170f23;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
 }
 .brand {
   font-size: 10.5px;
