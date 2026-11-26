@@ -5,9 +5,10 @@ contextBridge.exposeInMainWorld('api', {
     get: key => ipcRenderer.sendSync('store:get', key),
     set: (key, value) => ipcRenderer.sendSync('store:set', key, value)
   },
-  onStatus: cb => ipcRenderer.on('status', (_, s) => cb(s)),
-  onDiag: cb => ipcRenderer.on('diag', (_, d) => cb(d)),
-  onFrame: cb => ipcRenderer.on('frame', (_, d) => cb(d)),
   min: () => ipcRenderer.send('win:min'),
-  close: () => ipcRenderer.send('win:close')
+  close: () => ipcRenderer.send('win:close'),
+  dragStart: () => ipcRenderer.send('win:dragstart'),
+  dragEnd: () => ipcRenderer.send('win:dragend'),
+  onFrame: cb => ipcRenderer.on('frame', (e, d) => cb(d)),
+  onStatus: cb => ipcRenderer.on('status', (e, s) => cb(s))
 });
