@@ -1,17 +1,10 @@
 (function () {
   const statEl = document.getElementById('stat');
-  const probe = document.getElementById('probe');
-  document.addEventListener('mousemove', e => {
-    if (probe) probe.textContent = e.clientX + ',' + e.clientY;
-  }, { passive: true });
+  const dbgEl = document.getElementById('dbg');
+  if (statEl) statEl.textContent = 'app.js 読込済み';
+  console.log('app.js loaded');
 
   function fatal(msg) {
-    const bar = document.getElementById('err');
-    if (bar) {
-      bar.hidden = false;
-      bar.textContent = String(msg);
-      return;
-    }
     const c = document.getElementById('content');
     if (!c) return;
     c.innerHTML = '';
@@ -30,6 +23,13 @@
     c.appendChild(box);
   }
   window.addEventListener('error', ev => fatal(ev.message + ' @ ' + (ev.filename || '') + ':' + ev.lineno));
+
+  // クリック検知の可視化
+  document.addEventListener('pointerdown', e => {
+    if (!dbgEl) return;
+    const t = e.target;
+    dbgEl.textContent = 'down: ' + (t.id || t.className || t.tagName);
+  }, true);
 
   let hasBridge = false;
   const LS = (() => {
@@ -89,7 +89,7 @@
     ]},
     { id: 'misc', title: 'Misc', sub: 'Misc Settings', icon: I.misc, head: 'Misc Settings', cards: [
       { rows: [{ t: 'tog', id: 'misc.tracer', label: 'Bullet Tracers', desc: 'Draw the path of every shot' }] },
-      { rows: [{ t: 'tog', id: 'misc.skins', label: 'Valorant Skins', desc: 'Swap weapons for store finishes' }] },
+      { rows: [{ t: 'tog', id: 'misc.skins', label: 'CS2 Skins', desc: 'Swap weapons for CS2 finishes' }] },
       { rows: [{ t: 'tog', id: 'misc.bhop', label: 'Bunny Hop', desc: 'Auto-jump on landing' }] },
       { rows: [{ t: 'tog', id: 'misc.flash', label: 'Anti-Flash', desc: 'Ignore flashbang blindness' }] },
       { rows: [{ t: 'tog', id: 'misc.wm', label: 'Watermark', desc: 'Show the build in the corner' }] },
@@ -116,7 +116,6 @@
       { presets: true }
     ]},
     { id: 'setup', title: 'Setup', sub: 'Config & Mods', icon: I.setup, head: 'Config & Mods', cards: [
-      { rows: [{ t: 'diag' }] },
       { rows: [{ t: 'cfgsel' }] },
       { rows: [{ t: 'act', id: 'cfg.save', label: 'Save Config', desc: 'Store the current setup', text: 'Save' }] },
       { rows: [{ t: 'act', id: 'cfg.load', label: 'Load Config', desc: 'Restore a saved setup', text: 'Load' }] },
@@ -126,7 +125,7 @@
   ];
 
   const DEFAULTS = {
-    'aim.enable': true, 'aim.fov': 8, 'aim.delay': 20, 'aim.pred': false, 'aim.spread': true,
+    'aim.enable': true, 'aim.fov': 98, 'aim.delay': 35, 'aim.pred': false, 'aim.spread': true,
     'esp.enable': true, 'esp.box': true, 'esp.sil': true, 'esp.hp': true, 'esp.radar': false, 'esp.snap': false,
     'vis.outline': '#a855f7', 'vis.weapon': '#22d3ee', 'vis.fresnel': '#ec4899', 'vis.occ': '#ef4444', 'vis.cham': '#22c55e', 'vis.self': '#f59e0b',
     'misc.tracer': true, 'misc.skins': false, 'misc.bhop': true, 'misc.flash': true, 'misc.wm': true, 'misc.ribbon': '#a855f7',
@@ -136,9 +135,9 @@
   };
 
   const BUILTIN = {
-    Legit: { 'aim.fov': 6, 'aim.delay': 25, 'aim.pred': false, 'aim.spread': true, 'esp.box': true, 'esp.sil': false, 'esp.hp': true, 'tp.enable': false },
-    Rage: { 'aim.fov': 25, 'aim.delay': 0, 'aim.pred': true, 'aim.spread': true, 'esp.box': true, 'esp.sil': true, 'esp.hp': false, 'tp.enable': false },
-    HvH: { 'aim.fov': 180, 'aim.delay': 5, 'aim.pred': true, 'aim.spread': true, 'esp.box': true, 'esp.sil': true, 'esp.snap': true, 'esp.radar': true, 'tp.enable': false }
+    Legit: { 'aim.fov': 98, 'aim.delay': 35, 'aim.pred': false, 'aim.spread': true, 'esp.box': true, 'esp.sil': false, 'esp.hp': true, 'tp.enable': false },
+    Rage: { 'aim.fov': 24, 'aim.delay': 0, 'aim.pred': true, 'aim.spread': true, 'esp.box': true, 'esp.sil': true, 'esp.hp': false, 'tp.enable': false },
+    HvH: { 'aim.fov': 180, 'aim.delay': 10, 'aim.pred': true, 'aim.spread': true, 'esp.box': true, 'esp.sil': true, 'esp.snap': true, 'esp.radar': true, 'tp.enable': false }
   };
 
   const K_S = 'settings', K_C = 'configs', K_A = 'active', K_U = 'unlocked', K_T = 'tab';
@@ -158,7 +157,7 @@
     } catch (e) { return fb; }
   };
 
-  let S = Object.assign({}, DEFAULTS, readJSON(K_S, {}));
+  let S = readJSON(K_S, Object.assign({}, DEFAULTS));
   let CFG = readJSON(K_C, JSON.parse(JSON.stringify(BUILTIN)));
   let active = LS.getItem(K_A) || 'Legit';
   if (!CFG[active]) active = Object.keys(CFG)[0];
@@ -212,6 +211,7 @@
       card.classList.add('pcard');
       const w = el('div');
       w.style.flex = '1';
+      w.style.pointerEvents = 'none';
       w.append(el('div', 'ctitle', 'Presets'), el('div', 'cdesc', 'Apply a full look in one click'));
       const row = el('div', 'presets');
       [
@@ -235,7 +235,7 @@
     }
     const r = c.rows[0];
     const l = el('div', 'lbl');
-    l.append(el('div', 'ctitle', r.label || ''), el('div', 'cdesc', r.desc || ''));
+    l.append(el('div', 'ctitle', r.label), el('div', 'cdesc', r.desc));
     card.append(l, control(r));
     return card;
   }
@@ -270,6 +270,7 @@
       track.append(el('div', 'rail'), fill, knob);
       const val = el('div', 'val');
       wrap.append(track, val);
+
       const paint = () => {
         const p = ((S[r.id] - r.min) / (r.max - r.min)) * 100;
         fill.style.width = p + '%';
@@ -285,7 +286,12 @@
         paint();
       };
       let down = false;
-      track.addEventListener('pointerdown', e => { down = true; track.setPointerCapture(e.pointerId); fromX(e.clientX); });
+      track.addEventListener('pointerdown', e => {
+        down = true;
+        try { track.setPointerCapture(e.pointerId); } catch (err) {}
+        fromX(e.clientX);
+        e.preventDefault();
+      });
       track.addEventListener('pointermove', e => { if (down) fromX(e.clientX); });
       track.addEventListener('pointerup', () => { down = false; });
       track.addEventListener('pointercancel', () => { down = false; });
@@ -326,14 +332,6 @@
       if (r.id === 'skin.unlock' && unlocked) { b.textContent = 'Unlocked'; b.disabled = true; }
       b.onclick = () => action(r.id, b);
       return b;
-    }
-
-    if (r.t === 'diag') {
-      const box = el('div', 'val');
-      box.id = 'diag';
-      box.style.width = 'auto';
-      box.textContent = '待機中';
-      return box;
     }
 
     if (r.t === 'cfgsel') {
@@ -435,6 +433,13 @@
   if (hasBridge) {
     document.getElementById('minBtn').onclick = () => window.api.min();
     document.getElementById('closeBtn').onclick = () => window.api.close();
+
+    const tb = document.getElementById('titlebar');
+    tb.addEventListener('pointerdown', e => {
+      if (e.target.closest('.wbtn')) return;
+      window.api.dragStart();
+    });
+    window.addEventListener('pointerup', () => window.api.dragEnd());
   } else {
     document.getElementById('minBtn').style.display = 'none';
     document.getElementById('closeBtn').style.display = 'none';
@@ -442,22 +447,15 @@
 
   if (window.api && window.api.onStatus) {
     window.api.onStatus(s => {
-      if (statEl) {
-        statEl.textContent = s.text;
-        statEl.classList.toggle('on', s.attached);
-      }
-      const d = document.getElementById('diag');
-      if (d && s.diag) d.textContent = s.diag;
-    });
-  }
-  if (window.api && window.api.onDiag) {
-    window.api.onDiag(text => {
-      const d = document.getElementById('diag');
-      if (d) d.textContent = text;
+      if (!statEl) return;
+      statEl.textContent = s.text;
+      statEl.classList.toggle('on', s.attached);
     });
   }
 
   try {
+    Object.assign(S, CFG[active] || {});
+    save();
     buildSide();
     render();
     wm.classList.toggle('off', !S['misc.wm']);
