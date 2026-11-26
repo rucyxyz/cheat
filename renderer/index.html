@@ -6,10 +6,9 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="titlebar">
+  <div class="titlebar" id="titlebar">
     <div class="brand">cheat</div>
     <span class="stat" id="stat">待機中</span>
-    <span class="stat" id="probe"></span>
     <div class="spacer"></div>
     <button class="wbtn" id="minBtn" title="Minimize">
       <svg viewBox="0 0 12 12"><path d="M2 6h8"/></svg>
@@ -21,11 +20,10 @@
 
   <div class="panel" id="panel">
     <aside class="side" id="side"></aside>
-    <main class="content" id="content">
-      <div id="err" hidden></div>
-    </main>
+    <main class="content" id="content"></main>
     <div class="wm" id="wm">build 2.4.1</div>
     <div class="toast" id="toast"></div>
+    <div class="dbg" id="dbg"></div>
 
     <div class="modal" id="modal">
       <div class="mbox">
